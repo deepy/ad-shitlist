@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="css/bootstrap.css">
+
+    <title>PDF.js</title>
+</head>
+<body>
+<div class="input-group">
+    <input id="signature" type="text" class="form-control" placeholder="signature">
+    <input id="details" type="text" class="form-control" placeholder="name and address">
+    <div class="input-group-append">
+        <button id="save" class="btn btn-outline-secondary" type="button">Save locally</button>
+    </div>
+</div>
+
+<div class="container">
+    <button id="send" class="btn btn-outline-secondary" type="button">Send</button>
+    <div class="row">
+        <div id="form-list" class="list-group col-lg-4" data-toggle="items"></div>
+        <div id="company-list" class="list-group col-lg-6" data-toggle="items"></div>
+    </div>
+</div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.3.5/jspdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/2.3.0/mustache.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.6.0/localforage.min.js"></script>
+<script src="js/listgroup.min.js"></script>
+<script>
+    $.get('shitlist/companies.json', function(companies) {
+      for (comp of companies) {
+        // <span class="badge badge-pill badge-warning">rawr</span>
+        $('#company-list').append(`<a class="list-group-item d-flex justify-content-between align-items-center" href="#"><span class="comp">${comp.name}</span></a>`);
+      }
+    });
+
+    $.get('templates/list.json', function(templates) {
+      for (tpl of templates) {
+        $('#form-list').append(`<a class="list-group-item" href="#">${tpl}</a>`);
+      }
+    });
+
+    localforage.getItem('details').then(function (local_details) {
+      $('#signature').val(local_details.signature);
+      $('#details').val(local_details.personal_details);
+    });
+
+  $(document).ready(function () {
+    $('#save').on('click', function() {
+      localforage.setItem('details', {
+        signature: $('#signature').val(),
+        personal_details: $('#details').val()
+      }).then(function() { console.log('saved'); }).catch( function (err) { console.log(err); console.log('error'); })
+    });
+
+    $('#send').on('click', function() {
+      var templates = [];
+      const date = new Date();
+      $('#form-list').find('.active').each(function(i, e) {
+        const name = $(e).text();
+        $.ajax(`templates/${name}.tpl`, {async: false}).done(function (tpl) {
+          templates.push({name: name, template: tpl});
+        });
+      });
+
+      $('#company-list').find('.active').each(function(i, e) {
+        console.log(templates);
+        var doc = new jsPDF();
+        for (i in templates) {
+          if (i != 0) {
+            doc.addPage();
+          }
+          var template = templates[i];
+          doc.text(
+            Mustache.render(
+              template.template,
+              {
+                company: $(e).find('.comp').text(),
+                signature: $('#signature').val(),
+                personal_details: $('#details').val(),
+                date: `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDay()}`
+              }),
+            10, 10);
+        }
+      doc.save('form.pdf');
+      });
+    })
+  });
+</script>
+</html>
